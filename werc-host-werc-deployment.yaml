@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: werc-deployment
+  namespace: werc-host
+
+spec:
+  replicas: 15
+  selector:
+    matchLabels:
+      app: werc
+  template:
+    metadata:
+      labels:
+        app: werc
+    spec:
+      # init container is required as the data might not be preinstalled on the nfs volume
+      initContainers:
+      - name: werc-init
+        image: hngt/werc:latest
+        command: ["/bin/sh", "-c", "chmod -R a+rwx /var/www/werc; if [ -z \"$(ls -1 /var/www/werc | grep -v lost )\" ]; then wget http://werc.cat-v.org/download/werc-1.5.0.tar.gz && tar xvfk werc-1.5.0.tar.gz --strip-components=1 -C /var/www/werc; chmod -R a+rwx /var/www/werc; fi"]
+        volumeMounts:
+        - name: werc-sites
+          mountPath: /var/www/werc
+      containers:
+      - name: werc-container
+        image: hngt/werc:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: werc-sites
+          mountPath: /var/www/werc
+        - name: lighttpd-config
+          mountPath: /etc/lighttpd
+        tty: true
+      volumes:
+      - name: werc-sites
+        nfs:
+           server: 10.128.69.1
+           path: /exports
+      - name: lighttpd-config
+        configMap: 
+          name: lighttpd-config

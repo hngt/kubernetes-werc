@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: werc-service
+  namespace: werc-host
+spec:
+  selector:
+    app: werc
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: mikhal@riseup.net
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: werc-ingress
+  namespace: werc-host
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    cert-manager.io/http01-ingress-class: "nginx"
+    cert-manager.io/issue-temporary-certificate: "true"
+    nginx.ingress.kubernetes.io/proxy-cache: "werc-cache"
+    nginx.ingress.kubernetes.io/proxy-cache-key: "$scheme$request_method$host$request_uri"
+    nginx.ingress.kubernetes.io/proxy-cache-valid: "200 10m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-GG-Cache-Status $upstream_cache_status;
+
+#    nginx.ingress.kubernetes.io/rewrite-target: /
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - salvinor.in
+    secretName: salvinor-in-tls
+  rules:
+  - host: salvinor.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: werc-service
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configuration
+data:
+  proxy_cache_path: "/tmp/nginx levels=1:2 keys_zone=werc-cache:10m inactive=60m max_size=1000m"
+---
+
+

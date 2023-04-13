@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: werc-sites-pvc
+  namespace: werc-host
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: linode-block-storage
+  resources:
+    requests:
+      storage: 10Gi
